@@ -1,5 +1,7 @@
 # Gleb: the code taken from the ode elimination projects, tests are there
 
+using Oscar
+
 #---------Beginning of utils---------------------------------------------------
 
 function unpack_fraction(f)
