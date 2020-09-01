@@ -1,4 +1,4 @@
-@testset "Partial derivatives of a solution w.r.t. to initial conditions and parameters" begin
+@testset "Partial derivatives of an output w.r.t. to initial conditions and parameters" begin
 
     test_cases = []
 
