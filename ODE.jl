@@ -97,3 +97,34 @@ function reduce_ode_mod_p(ode::ODE, p)
 end
 
 #------------------------------------------------------------------------------
+
+function generate_replica(ode::ODE, outputs, r::Int)
+    """
+    Returns (ode_r, outputs_r), and r-fold replica of the original pair (ode, outputs).
+    States, outputs, and inputs are replicated, parameters are not
+    """
+    new_varnames = map(string, ode.parameters)
+    for v in vcat(ode.x_vars, ode.u_vars)
+        append!(new_varnames, ["$(v)_r$i" for i in 1:r])
+    end
+    new_ring, new_vars = PolynomialRing(base_ring(ode.poly_ring), new_varnames)
+    new_eqs = Dict()
+    new_outputs = []
+    new_us = []
+    for i in 1:r
+        eval = merge(
+            Dict(p => str_to_var(string(p), new_ring) for p in ode.parameters),
+            Dict(v => str_to_var("$(v)_r$i", new_ring) for v in vcat(ode.x_vars, ode.u_vars))
+        )
+        eval_vec = [eval[v] for v in gens(ode.poly_ring)]
+        append!(new_outputs, map(p -> evaluate(p, eval_vec), outputs))
+        new_eqs = merge(
+            new_eqs, 
+            Dict(evaluate(x, eval_vec) => evaluate(f, eval_vec) for (x, f) in ode.equations)
+        )
+        append!(new_us, [str_to_var("$(u)_r$i", new_ring) for u in ode.u_vars])
+    end
+    return (ODE(new_eqs, new_us), new_outputs)
+end
+
+#------------------------------------------------------------------------------
