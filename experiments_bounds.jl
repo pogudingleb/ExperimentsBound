@@ -172,3 +172,25 @@ function compute_defect(ode::ODE, outputs, p::Float64 = 0.99)
 end
 
 #------------------------------------------------------------------------------
+
+function bound_number_experiments(ode::ODE, outputs, p::Float64=0.99)
+    """
+    Input:
+        - ode, an ODE object representing an ODE system over Q
+        - outputs, rational function being the outputs of the system
+    Output: a named tuple with field loc and glob giving upper bounds to the
+    NumExpLoc and NumExpGlob, respectively (for definitions, see the paper)
+    """
+    defect_prev = length(ode.parameters)
+    for i in 1:(length(ode.parameters) + 1)
+        ode_replicated, outputs_replicated = generate_replica(ode, outputs, i)
+        defect_cur = compute_defect(ode_replicated, outputs_replicated, 1. - (1. - p) / length(ode.parameters))
+        if defect_prev == defect_cur
+            return (loc = i - 1, glob = i)
+        end
+        defect_prev = defect_cur
+    end
+    throw(Core.ErrorException("Too many steps for defect to stabilize. Something is wrong here"))
+end
+
+#------------------------------------------------------------------------------
