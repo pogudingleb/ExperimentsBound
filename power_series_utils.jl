@@ -17,6 +17,13 @@ function str_to_var(s, ring)
     return gens(ring)[findfirst(v -> (string(v) == s), gens(ring))]
 end
 
+#------------------------------------------------------------------------------
+
+function eval_at_dict(poly, d)
+    point = [get(d, v, base_ring(parent(poly))(0)) for v in gens(parent(poly))]
+    return evaluate(poly, point)
+end
+
 #---------End of utils---------------------------------------------------------
 #------------------------------------------------------------------------------
 
@@ -142,8 +149,9 @@ end
 function ps_matrix_linear_de(A, B, Y0, prec=nothing)
     """
     Input:
-        - A, B - square matrices with entries in a univariate power series ring
-        - Y0 - a matrix over the base field with the rows number the same as A
+        - A - square matrices with entries in a univariate power series ring
+        - B - a matrix over power series with the same number of rows as A
+        - Y0 - a matrix over the base field with dimensions as B
     Output: matrix Y such that Y' = AY + B up to precision of A - 1 and Y(0) = Y0
     """
     prec = (prec == nothing) ? precision(A[1, 1]) : prec
