@@ -1,10 +1,11 @@
 function linear_compartment_model(graph, sinks, inputs)
     """
     Input: 
-        - graph of the model network represented via adjacency lists
-        - list of the indices of nodes having a sink
+        - graph - graph of the model network represented via adjacency lists
+        - sinks - the indices of nodes having a sink
+        - inputs - list of the nodes having differentially transcendental input
     Output: the corresponding ODE object where each parameter a_ij is replaced
-            with a_ij + b_ij * u, where u is a constant input
+            with a_ij + b_ij * v, where v is a constant input encoded as a constant output
     """
     n = length(graph)
     x_vars_names = ["x$i" for i in 1:n]
@@ -46,6 +47,8 @@ function linear_compartment_model(graph, sinks, inputs)
     return ODE(equations, [str_to_var("u$i", R) for i in inputs])
 end
 
+#------------------------------------------------------------------------------
+
 function bicycle(n)
     """
     Generates a bidirected cycle of length n
@@ -59,12 +62,22 @@ function bicycle(n)
     return graph
 end
 
+#------------------------------------------------------------------------------
+
 function cycle(n)
+    """
+    Single directed cycle
+    """
     graph = [[(i == n) ? 1 : (i + 1)] for i in 1:n]
     return graph
 end
 
+#------------------------------------------------------------------------------
+
 function catenary(n)
+    """
+    Bidirected chain from 1 to n
+    """
     graph = [[] for i in 1:n]
     for i in 1:n
         if i != 1
@@ -77,7 +90,12 @@ function catenary(n)
     return graph
 end
 
+#------------------------------------------------------------------------------
+
 function mammilary(n)
+    """
+    Bidirected 'star' with center at 1 and rays to 2, ..., n
+    """
     graph = []
     push!(graph, [i for i in 2:n])
     for i in 2:n
@@ -85,3 +103,5 @@ function mammilary(n)
     end
     return graph
 end
+
+#------------------------------------------------------------------------------

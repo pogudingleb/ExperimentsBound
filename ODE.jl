@@ -1,4 +1,4 @@
-# Gleb: the code taken from the ode elimination projects, tests are there
+# Gleb: the code taken from the ode elimination project, tests are there
 
 using Oscar
 
@@ -125,6 +125,35 @@ function generate_replica(ode::ODE, outputs, r::Int)
         append!(new_us, [str_to_var("$(u)_r$i", new_ring) for u in ode.u_vars])
     end
     return (ODE(new_eqs, new_us), new_outputs)
+end
+
+#------------------------------------------------------------------------------
+
+function print_for_SIAN(ode::ODE, outputs)
+    """
+    Prints the ODE in the format accepted by SIAN (https://github.com/pogudingleb/SIAN)
+    """
+    var_to_str = Dict(x => "$(x)(t)" for x in vcat(ode.x_vars, ode.u_vars))
+    merge!(var_to_str, Dict(p => string(p) for p in ode.parameters))
+    R_print, vars_print = PolynomialRing(base_ring(ode.poly_ring), [var_to_str[v] for v in gens(ode.poly_ring)])
+    result = ""
+
+    function _lhs_to_str(lhs)
+        num, den = unpack_fraction(lhs)
+        result = string(evaluate(num, vars_print))
+        if den != 1
+             result = "($result) / ($(evaluate(den, vars_print)))"
+        end
+        return result
+    end
+
+    for (x, f) in ode.equations
+        result = result * "diff($(x)(t), t) = $(_lhs_to_str(f)) \n"
+    end
+    for (y_ind, g) in enumerate(outputs)
+        result = result * "y_var_$y_ind = $(_lhs_to_str(g)) \n"
+    end
+    return result
 end
 
 #------------------------------------------------------------------------------
