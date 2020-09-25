@@ -18,7 +18,13 @@ end
 
 #------------------------------------------------------------------------------
 
-function differentiate_solution(ode::ODE, params, ic, inputs, prec::Int)
+function differentiate_solution(
+        ode::ODE{P},
+        params::Dict{P, T},
+        ic::Dict{P, T},
+        inputs::Dict{P, Array{T, 1}},
+        prec::Int
+    ) where {T <: Generic.FieldElem, P <: MPolyElem{T}}
     """
     Input: the same as for power_series_solutions
     Output: a tuple consisting of the power series solution and 
@@ -68,7 +74,14 @@ end
 
 #------------------------------------------------------------------------------
 
-function differentiate_output(ode::ODE, outputs, params, ic, inputs, prec::Int)
+function differentiate_output(
+        ode::ODE{P},
+        outputs::Array{P, 1},
+        params::Dict{P, T},
+        ic::Dict{P, T},
+        inputs::Dict{P, Array{T, 1}},
+        prec::Int
+    ) where {T <: Generic.FieldElem, P <: MPolyElem{T}}
     """
     Similar to differentiate_solution but computes partial derivatives of a prescribed outputs
     returns a list of dictionaries var => dy / dvar
@@ -99,16 +112,11 @@ end
 
 #------------------------------------------------------------------------------
 
-function get_degree_and_coeffsize(f)
+function get_degree_and_coeffsize(f::MPolyElem{Nemo.fmpq})
     """
-    for f being rational function or polynomial over QQ returns a tuple
+    for f being polynomial over QQ returns a tuple
     (degree, max_coef_size)
     """
-    if applicable(numerator, f)
-        num_deg, num_coef = get_degree_and_coeffsize(numerator(f))
-        den_deg, den_coef = get_degree_and_coeffsize(denominator(f))
-        return (max(num_deg, den_deg), max(num_coef, den_coef))
-    end
     if length(f) == 0
         return (0, 1)
     end
@@ -119,9 +127,20 @@ function get_degree_and_coeffsize(f)
     return (total_degree(f), max_coef)
 end
 
+function get_degree_and_coeffsize(f::Generic.Frac{<: MPolyElem{Nemo.fmpq}})
+    """
+    for f being rational function over QQ returns a tuple
+    (degree, max_coef_size)
+    """
+    num_deg, num_coef = get_degree_and_coeffsize(numerator(f))
+    den_deg, den_coef = get_degree_and_coeffsize(denominator(f))
+    return (max(num_deg, den_deg), max(num_coef, den_coef))
+end
+
+
 #------------------------------------------------------------------------------
 
-function compute_defect(ode::ODE, outputs, p::Float64 = 0.99)
+function compute_defect(ode::ODE{P}, outputs::Array{P, 1}, p::Float64 = 0.99) where P <: MPolyElem{Nemo.fmpq}
     """
     Computed the identifiability defect (Definition 2.6) of an ode system with respect
     to the given outputs with probability at least p
@@ -144,6 +163,7 @@ function compute_defect(ode::ODE, outputs, p::Float64 = 0.99)
     Dprime = D * (2 * log(n + ell + r + 1) + log(mu * D)) + 4 * (n + ell)^2 * ((n + m) * h + log(2 * n * D))
     prime = Primes.nextprime(Int(ceil(2 * mu * Dprime)))
     @debug "The prime is $prime"
+    prime = 2^31 - 1
     F = GF(prime)
  
     @debug "Reducing the system modulo prime"
@@ -152,7 +172,7 @@ function compute_defect(ode::ODE, outputs, p::Float64 = 0.99)
     prec = length(ode.x_vars) + length(ode.parameters)
     params_vals = Dict(p => F(rand(1:prime)) for p in ode_red.parameters)
     ic = Dict(x => F(rand(1:prime)) for x in ode_red.x_vars)
-    inputs = Dict(u => [F(rand(1:prime)) for i in 1:prec] for u in ode_red.u_vars)
+    inputs = Dict{typeof(outputs_red[1]), Array{Nemo.gfp_elem, 1}}(u => [F(rand(1:prime)) for i in 1:prec] for u in ode_red.u_vars)
 
     @debug "Computing the output derivatives"
     output_derivatives = differentiate_output(ode_red, outputs_red, params_vals, ic, inputs, prec)
@@ -175,7 +195,7 @@ end
 
 #------------------------------------------------------------------------------
 
-function bound_number_experiments(ode::ODE, outputs, p::Float64=0.99)
+function bound_number_experiments(ode::ODE{P}, outputs::Array{P, 1}, p::Float64=0.99) where P <: MPolyElem{Nemo.fmpq}
     """
     Input:
         - ode, an ODE object representing an ODE system over Q

@@ -1,12 +1,14 @@
 @testset "Computing identifiability defect" begin
 
     test_cases = []
+    P = fmpq_mpoly
+    DType = Union{P, Generic.Frac{P}}
 
     R, (x, a) = PolynomialRing(QQ, ["x", "a"])
     push!(
         test_cases,
         Dict(
-            "ODE" => ODE(Dict(x => x + a), []),
+             "ODE" => ODE{P}(Dict{P, DType}(x => x + a), Array{P, 1}()),
             "outputs" => [x],
             "answer" => 0
         )
@@ -16,7 +18,7 @@
     push!(
         test_cases,
         Dict(
-            "ODE" => ODE(Dict(x => x), []),
+            "ODE" => ODE{P}(Dict{P, DType}(x => x), Array{P, 1}()),
             "outputs" => [x^2],
             "answer" => 1
         )
@@ -26,7 +28,7 @@
     push!(
         test_cases,
         Dict(
-            "ODE" => ODE(Dict(x => a * y, y => b * x), []),
+            "ODE" => ODE{P}(Dict{P, DType}(x => a * y, y => b * x), Array{P, 1}()),
             "outputs" => [x],
             "answer" => 1
         )
@@ -36,7 +38,7 @@
     push!(
         test_cases,
         Dict(
-             "ODE" => ODE(Dict(
+             "ODE" => ODE{P}(Dict{P, DType}(
                  x => a * x - b * x * y + u,
                  y => -c * y + d * x * y
              ), [u]),
@@ -49,13 +51,13 @@
     push!(
         test_cases,
         Dict(
-             "ODE" => ODE(Dict(
+             "ODE" => ODE{P}(Dict{P, DType}(
                  M => vs * KI^4 // (KI^4 + PN^4) - vm * M // (Km + M),
                  P0 => ks * M  - V1 * P0 // (K1 + P0) + V2 * P1 // (K2 + P1),
                  P1 => V1 * P0 // (K1 + P0) + V4 * P2 // (K2 + P2) - P1 * (V2 // (K2 + P1) + V3 // (K3 + P1)),
                  P2 => V3 * P1 // (K3 + P1) - P2 * (V4 // (K4 + P2) + k1 + vd // (Kd + P2)) + k2 * PN,
                  PN => k1 * P2 - k2 * PN
-             ), []), 
+             ), Array{P, 1}()),
              "outputs" => [PN],
              "answer" => 1
         )
@@ -65,9 +67,9 @@
     push!(
         test_cases,
         Dict(
-             "ODE" => ODE(Dict(
+             "ODE" => ODE{P}(Dict{P, DType}(
                  x => x + a1 + a2 + a3 + a4
-             ), []),
+             ), Array{P, 1}()),
              "outputs" => [x^5],
              "answer" => 3
         )
