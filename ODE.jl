@@ -50,22 +50,23 @@ function power_series_solution(
     Output: computes a power series solution with precision prec presented as a dictionary
             variable => corresponding coordiante of the solution
     """
-    new_varnames = map(string, vcat(ode.x_vars, map(v -> "$(v)_dot", ode.x_vars), ode.u_vars))
+    new_varnames = map(var_to_str, vcat(ode.x_vars, ode.u_vars))
+    append!(new_varnames, map(v -> var_to_str(v) * "_dot", ode.x_vars))
 
     new_ring, new_vars = PolynomialRing(base_ring(ode.poly_ring), new_varnames)
     equations = Array{P, 1}()
     evaluation = Dict(k => new_ring(v) for (k, v) in param_values)
     for v in vcat(ode.x_vars, ode.u_vars)
-        evaluation[v] = str_to_var(string(v), new_ring)
+        evaluation[v] = switch_ring(v, new_ring)
     end
     for (v, eq) in ode.equations
         num, den = map(p -> eval_at_dict(p, evaluation), unpack_fraction(eq))
-        push!(equations, den * str_to_var("$(v)_dot", new_ring) - num)
+        push!(equations, den * str_to_var(var_to_str(v) * "_dot", new_ring) - num)
     end
-    new_inputs = Dict(str_to_var(string(k), new_ring) => v for (k, v) in input_values)
-    new_ic = Dict(str_to_var(string(k), new_ring) => v for (k, v) in initial_conditions)
+    new_inputs = Dict(switch_ring(k, new_ring) => v for (k, v) in input_values)
+    new_ic = Dict(switch_ring(k, new_ring) => v for (k, v) in initial_conditions)
     result = ps_ode_solution(equations, new_ic, new_inputs, prec)
-    return Dict(v => result[str_to_var(string(v), new_ring)] for v in vcat(ode.x_vars, ode.u_vars))
+    return Dict(v => result[switch_ring(v, new_ring)] for v in vcat(ode.x_vars, ode.u_vars))
 end
 
 #------------------------------------------------------------------------------
@@ -107,12 +108,12 @@ function reduce_ode_mod_p(ode::ODE{<: MPolyElem{Nemo.fmpq}}, p::Int)
     Input: ode is an ODE over QQ, p is a prime number
     Output: the reduction mod p, throws an exception if p divides one of the denominators
     """
-    new_ring, new_vars = PolynomialRing(GF(p), map(string, gens(ode.poly_ring)))
+    new_ring, new_vars = PolynomialRing(GF(p), map(var_to_str, gens(ode.poly_ring)))
     new_type = typeof(new_vars[1])
-    new_inputs = map(u -> str_to_var(string(u), new_ring), ode.u_vars)
+    new_inputs = map(u -> switch_ring(u, new_ring), ode.u_vars)
     new_eqs = Dict{new_type, Union{new_type, Generic.Frac{new_type}}}()
     for (v, f) in ode.equations
-        new_v = str_to_var(string(v), new_ring)
+        new_v = switch_ring(v, new_ring)
         if applicable(numerator, f)
             # if f is a rational function
             num, den = map(poly -> _reduce_poly_mod_p(poly, p), [numerator(f), denominator(f)])
@@ -133,9 +134,9 @@ function print_for_SIAN(ode::ODE{P}, outputs::Array{P, 1}) where P <: MPolyElem{
     """
     Prints the ODE in the format accepted by SIAN (https://github.com/pogudingleb/SIAN)
     """
-    var_to_str = Dict(x => "$(x)(t)" for x in vcat(ode.x_vars, ode.u_vars))
-    merge!(var_to_str, Dict(p => string(p) for p in ode.parameters))
-    R_print, vars_print = PolynomialRing(base_ring(ode.poly_ring), [var_to_str[v] for v in gens(ode.poly_ring)])
+    vars_str = Dict(x => var_to_str(x) * "(t)" for x in vcat(ode.x_vars, ode.u_vars))
+    merge!(vars_str, Dict(p => var_to_str(p) for p in ode.parameters))
+    R_print, vars_print = PolynomialRing(base_ring(ode.poly_ring), [vars_str[v] for v in gens(ode.poly_ring)])
     result = ""
 
     function _lhs_to_str(lhs)
@@ -148,7 +149,7 @@ function print_for_SIAN(ode::ODE{P}, outputs::Array{P, 1}) where P <: MPolyElem{
     end
 
     for (x, f) in ode.equations
-        result = result * "diff($(x)(t), t) = $(_lhs_to_str(f)), \n"
+        result = result * "diff(" * var_to_str(x) * "(t), t) = $(_lhs_to_str(f)), \n"
     end
     for (y_ind, g) in enumerate(outputs)
         result = result * "y_var_$y_ind(t) = $(_lhs_to_str(g)), \n"
@@ -261,7 +262,7 @@ function generate_replica(ode::ODE{P}, outputs::Array{P, 1}, r::Int) where P <: 
     """
     new_varnames = map(string, ode.parameters)
     for v in vcat(ode.x_vars, ode.u_vars)
-        append!(new_varnames, ["$(v)_r$i" for i in 1:r])
+        append!(new_varnames, [var_to_str(v) * "_r$i" for i in 1:r])
     end
     new_ring, new_vars = PolynomialRing(base_ring(ode.poly_ring), new_varnames)
     new_eqs = Dict{P, Union{P, Generic.Frac{P}}}()
@@ -269,16 +270,16 @@ function generate_replica(ode::ODE{P}, outputs::Array{P, 1}, r::Int) where P <: 
     new_us = Array{P, 1}()
     for i in 1:r
         eval = merge(
-            Dict(p => str_to_var(string(p), new_ring) for p in ode.parameters),
-            Dict(v => str_to_var("$(v)_r$i", new_ring) for v in vcat(ode.x_vars, ode.u_vars))
+            Dict(p => switch_ring(p, new_ring) for p in ode.parameters),
+            Dict(v => str_to_var(var_to_str(v) * "_r$i", new_ring) for v in vcat(ode.x_vars, ode.u_vars))
         )
         eval_vec = [eval[v] for v in gens(ode.poly_ring)]
         append!(new_outputs, map(p -> evaluate(p, eval_vec), outputs))
         new_eqs = merge(
             new_eqs, 
-            Dict(evaluate(x, eval_vec) => evaluate(f, eval_vec) for (x, f) in ode.equations)
+            Dict{P, Union{P, Generic.Frac{P}}}(evaluate(x, eval_vec) => evaluate(f, eval_vec) for (x, f) in ode.equations)
         )
-        append!(new_us, [str_to_var("$(u)_r$i", new_ring) for u in ode.u_vars])
+        append!(new_us, [str_to_var(var_to_str(u) * "_r$i", new_ring) for u in ode.u_vars])
     end
     return (ODE{P}(new_eqs, new_us), new_outputs)
 end

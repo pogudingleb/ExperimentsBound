@@ -26,7 +26,28 @@ end
 #------------------------------------------------------------------------------
 
 function str_to_var(s::String, ring::MPolyRing)
-    return gens(ring)[findfirst(v -> (string(v) == s), gens(ring))]
+    ind = findfirst(v -> (string(v) == s), symbols(ring))
+    if ind == nothing
+        throw(Base.KeyError("Variable $s is not found in ring $ring"))
+    end
+    return gens(ring)[ind]
+end
+
+#------------------------------------------------------------------------------
+
+function var_to_str(v::MPolyElem)
+    ind = findfirst(vv -> vv == v, gens(parent(v)))
+    return string(symbols(parent(v))[ind])
+end
+
+#------------------------------------------------------------------------------
+
+function switch_ring(v::MPolyElem, ring::MPolyRing)
+    """
+    For a variable v, returns a variable in ring with the same name
+    """
+    ind = findfirst(vv -> vv == v, gens(parent(v)))
+    return str_to_var(string(symbols(parent(v))[ind]), ring)
 end
 
 #---------End of utils---------------------------------------------------------
@@ -212,9 +233,9 @@ function ps_ode_solution(
     Svconst = MatrixSpace(base_ring(ring), n, 1)
     eqs = Sv(equations)
     
-    x_vars = filter(v -> ("$(v)_dot" in map(string, gens(ring))), gens(ring))
+    x_vars = filter(v -> (var_to_str(v) * "_dot" in map(string, symbols(ring))), gens(ring))
     x_vars = [x for x in x_vars]
-    x_dot_vars = [str_to_var("$(x)_dot", ring) for x in x_vars]
+    x_dot_vars = [str_to_var(var_to_str(x) * "_dot", ring) for x in x_vars]
 
     Jac_dots = S([derivative(p, xd) for p in equations, xd in x_dot_vars])
     Jac_xs = S([derivative(p, x) for p in equations, x in x_vars])
